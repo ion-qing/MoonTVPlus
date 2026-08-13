@@ -1,0 +1,31 @@
+name: "Sync Fork with upstream"
+
+on:
+  schedule:
+    - cron: '0 0 * * *'          # 每天 00:00
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
+
+      - name: Sync upstream/main
+        run: |
+          git fetch upstream
+          # 先尝试合并，若冲突自动采用 ours
+          git merge upstream/main --no-edit || git merge upstream/main -s ours
+          git push origin main || true
