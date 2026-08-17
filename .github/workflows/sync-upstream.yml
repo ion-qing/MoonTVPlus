@@ -1,31 +1,88 @@
-name: "Sync Fork with upstream"
+name: Sync Fork with upstream
 
 on:
   schedule:
-    - cron: '0 0 * * *'          # 每天 00:00
-  push:
-    branches:
-      - main
+    # UTC 18:30 = Beijing time 02:30 the following day.
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      upstream_changed: ${{ steps.check.outputs.changed }}
+
     steps:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          ref: main
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Set up git
+      - name: Configure Git
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git
 
-      - name: Sync upstream/main
+      - name: Fetch upstream
+        run: git fetch upstream main
+
+      - name: Check for upstream changes
+        id: check
+        shell: bash
         run: |
-          git fetch upstream
-          # 先尝试合并，若冲突自动采用 ours
-          git merge upstream/main --no-edit || git merge upstream/main -s ours
-          git push origin main || true
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Fork already contains the latest upstream commits."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "New upstream commits found."
+          fi
+
+      - name: Merge upstream changes and prefer upstream on conflicts
+        if: steps.check.outputs.changed == 'true'
+        shell: bash
+        run: |
+          if ! git merge upstream/main --no-edit -X theirs; then
+            while IFS= read -r -d '' path; do
+              if git cat-file -e "upstream/main:$path" 2>/dev/null; then
+                git restore --source=upstream/main --staged --worktree -- "$path"
+              else
+                git rm -f -- "$path"
+              fi
+            done < <(git diff --name-only --diff-filter=U -z)
+
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              echo "Unable to resolve all merge conflicts automatically."
+              exit 1
+            fi
+
+            git commit --no-edit
+          fi
+
+          git push origin HEAD:main
+
+  deploy:
+    needs: sync
+    if: needs.sync.outputs.upstream_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - name: Dispatch Deploy to Cloudflare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/cloudflare-deploy.yml/dispatches" \
+            -f ref=main
