@@ -1,13 +1,12 @@
 name: Sync Fork with upstream
 
-# ① 这里声明全局权限，允许写入工作流文件
+# 全局权限：写入内容、actions、workflow
 permissions:
   contents: write
   actions: write
 
 on:
   schedule:
-    # UTC 18:30 = 北京时间 02:30
     - cron: "30 18 * * *"
   workflow_dispatch:
 
@@ -18,7 +17,6 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # ② 这里保留 job 层级的权限（可选）
     permissions:
       contents: write
     outputs:
