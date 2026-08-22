@@ -10,6 +10,11 @@ concurrency:
   group: sync-upstream
   cancel-in-progress: false
 
+permissions:
+  contents: write
+  actions: write
+  workflow: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
