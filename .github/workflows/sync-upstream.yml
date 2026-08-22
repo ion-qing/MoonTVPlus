@@ -4,7 +4,6 @@ name: Sync Fork with upstream
 permissions:
   contents: write
   actions: write
-  workflow: write
 
 on:
   schedule:
@@ -19,7 +18,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # ② 这里保留 job 层级的权限（可选，保持不变）
+    # ② 这里保留 job 层级的权限（可选）
     permissions:
       contents: write
     outputs:
@@ -31,7 +30,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          # ③ 用 PAT 代替默认凭据
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Configure Git
