@@ -1,5 +1,10 @@
 name: Sync Fork with upstream
 
+permissions:
+  contents: write
+  actions: write
+  workflow: write
+
 on:
   schedule:
     # UTC 18:30 = Beijing time 02:30 the following day.
@@ -24,7 +29,8 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          token: ${{ secrets.PAT_TOKEN }}
+
 
       - name: Configure Git
         run: |
